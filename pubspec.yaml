@@ -1,0 +1,35 @@
+name: edushelf_reading_application
+description: "Edushelf - A Mobile Reading Application for Digitalized Learning Materials and Syllabus Management"
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.5.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+  supabase_flutter: ^2.8.0
+  shared_preferences: ^2.3.2
+  file_picker: 10.2.4
+  connectivity_plus: ^6.1.0
+  pdfx: ^2.6.0
+  http: ^1.2.2
+  url_launcher: ^6.3.1
+  crypto: ^3.0.6
+  path_provider: ^2.1.5
+  share_plus: ^12.0.2
+  pdf: ^3.13.1
+  printing: ^5.15.1
+  syncfusion_flutter_pdf: ^35.1.41
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
