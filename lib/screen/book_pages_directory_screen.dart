@@ -173,8 +173,42 @@ class _BookPagesDirectoryScreenState extends State<BookPagesDirectoryScreen> {
   }
 
   Future<void> _deleteDownloads() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1C2541),
+        title: const Text('Delete downloads?',
+            style: TextStyle(color: Colors.white)),
+        content: const Text(
+            'The downloaded pages are removed from this device, and your '
+            'reading progress and bookmarks for this material are reset.',
+            style: TextStyle(color: Color(0xFF94A3B8))),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel',
+                style: TextStyle(color: Color(0xFF94A3B8))),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFEF4444),
+                foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+
     await _library.deleteDownloads(widget.material.id);
-    if (mounted) _snack('Downloads removed from this device.');
+    if (!mounted) return;
+    setState(() {
+      widget.material.currentPage = 0;
+      widget.material.readPages.clear();
+    });
+    widget.onProgressUpdated();
+    _snack('Downloads deleted. Progress and bookmarks were reset.');
   }
 
   void _openQueue() {
@@ -346,7 +380,7 @@ class _BookPagesDirectoryScreenState extends State<BookPagesDirectoryScreen> {
                           Text(
                             mat.totalPages == 0
                                 ? 'Reading Progress: ${mat.progressPercent}%'
-                                : 'Reading Progress: ${mat.progressPercent}% (${mat.currentPage}/${mat.totalPages})',
+                                : 'Reading Progress: ${mat.progressPercent}% (${mat.readPages.length}/${mat.totalPages} pages read)',
                             style: const TextStyle(
                                 color: Color(0xFF38BDF8),
                                 fontSize: 12,
@@ -503,7 +537,7 @@ class _BookPagesDirectoryScreenState extends State<BookPagesDirectoryScreen> {
 
   Widget _buildPageTile(int pageNum) {
     final mat = widget.material;
-    final isRead = pageNum <= mat.currentPage;
+    final isRead = mat.readPages.contains(pageNum);
     final isCurrent = pageNum == mat.currentPage;
 
     return Material(

@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
-import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:pdfx/pdfx.dart';
 import '../models/learning_material.dart';
@@ -9,6 +9,7 @@ import '../services/activity_service.dart';
 import '../services/download_service.dart';
 import '../services/library_service.dart';
 import '../widgets/flipbook_view.dart';
+import '../widgets/vertical_pages_view.dart';
 
 enum ReaderMode { flipbook, vertical }
 
@@ -18,12 +19,16 @@ class PhysicalFlipbookReader extends StatefulWidget {
   final Function(int) onProgressSaved;
   final dynamic session;
 
+  /// False for the admin's preview: nothing is saved as reading progress.
+  final bool trackProgress;
+
   const PhysicalFlipbookReader({
     super.key,
     required this.material,
     required this.initialPage,
     required this.onProgressSaved,
     this.session,
+    this.trackProgress = true,
   });
 
   @override
@@ -45,7 +50,16 @@ class _PhysicalFlipbookReaderState extends State<PhysicalFlipbookReader> {
   Future<void> _renderLock = Future.value();
   final _flipbookKey = GlobalKey<FlipbookViewState>();
 
-  // Vertical: continuous, zoomable scroll.
+  // Vertical on desktop: pages rendered like the flipbook (pdfx's scroll
+  // view only shows gray there).
+  static final _ownVerticalView = !kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.windows ||
+          defaultTargetPlatform == TargetPlatform.linux ||
+          defaultTargetPlatform == TargetPlatform.macOS);
+  final _verticalKey = GlobalKey<VerticalPagesViewState>();
+  double _pageAspect = 1 / 1.414; // A4 until the first page is measured
+
+  // Vertical on phones: continuous, pinch-zoomable scroll.
   PdfControllerPinch? _pinchController;
   Future<PdfDocument>? _pinchDocument;
 
@@ -54,7 +68,9 @@ class _PhysicalFlipbookReaderState extends State<PhysicalFlipbookReader> {
     super.initState();
     _currentPage = widget.initialPage < 1 ? 1 : widget.initialPage;
     _loadPdf();
-    LibraryService.instance.recordAccess(widget.material);
+    if (widget.trackProgress) {
+      LibraryService.instance.recordAccess(widget.material);
+    }
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _logActivity('open');
@@ -68,14 +84,24 @@ class _PhysicalFlipbookReaderState extends State<PhysicalFlipbookReader> {
       final document = await PdfDocument.openData(bytes);
 
       final pages = document.pagesCount;
-      if (widget.material.totalPages != pages) {
+      if (widget.trackProgress && widget.material.totalPages != pages) {
         await LibraryService.instance.setPageCount(widget.material, pages);
       }
+
+      final first = await document.getPage(1);
+      _pageAspect = first.width / first.height;
+      await first.close();
 
       _bytes = bytes;
       _renderDocument = document;
       _pageCount = pages;
       _currentPage = _currentPage.clamp(1, pages);
+
+      // The page the reader opens on counts as read too.
+      if (widget.trackProgress) {
+        widget.onProgressSaved(_currentPage);
+        LibraryService.instance.saveProgress(widget.material, _currentPage);
+      }
 
       if (mounted) setState(() => _isLoading = false);
     } catch (e) {
@@ -139,6 +165,7 @@ class _PhysicalFlipbookReaderState extends State<PhysicalFlipbookReader> {
   void _onPageChanged(int pageNumber) {
     if (_currentPage == pageNumber) return;
     setState(() => _currentPage = pageNumber);
+    if (!widget.trackProgress) return;
     widget.onProgressSaved(pageNumber);
     // Save progress on the device so "Resume" works after a restart.
     LibraryService.instance.saveProgress(widget.material, pageNumber);
@@ -164,11 +191,13 @@ class _PhysicalFlipbookReaderState extends State<PhysicalFlipbookReader> {
   void _toggleMode() {
     setState(() {
       if (_mode == ReaderMode.flipbook) {
-        _pinchDocument = PdfDocument.openData(_bytes!);
-        _pinchController = PdfControllerPinch(
-          document: _pinchDocument!,
-          initialPage: _currentPage,
-        );
+        if (!_ownVerticalView) {
+          _pinchDocument = PdfDocument.openData(_bytes!);
+          _pinchController = PdfControllerPinch(
+            document: _pinchDocument!,
+            initialPage: _currentPage,
+          );
+        }
         _mode = ReaderMode.vertical;
       } else {
         _disposeVertical();
@@ -187,6 +216,8 @@ class _PhysicalFlipbookReaderState extends State<PhysicalFlipbookReader> {
   void _previousPage() {
     if (_mode == ReaderMode.flipbook) {
       _flipbookKey.currentState?.flipPrevious();
+    } else if (_ownVerticalView) {
+      _verticalKey.currentState?.previousPage();
     } else {
       _pinchController?.previousPage(
           duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
@@ -196,6 +227,8 @@ class _PhysicalFlipbookReaderState extends State<PhysicalFlipbookReader> {
   void _nextPage() {
     if (_mode == ReaderMode.flipbook) {
       _flipbookKey.currentState?.flipNext();
+    } else if (_ownVerticalView) {
+      _verticalKey.currentState?.nextPage();
     } else {
       _pinchController?.nextPage(
           duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
@@ -247,19 +280,21 @@ class _PhysicalFlipbookReaderState extends State<PhysicalFlipbookReader> {
             ),
             onPressed: _isLoading || _error != null ? null : _toggleMode,
           ),
-          Builder(builder: (context) {
-            final marked = LibraryService.instance
-                .isBookmarked(widget.material.id, _currentPage);
-            return IconButton(
-              tooltip: marked ? 'Remove bookmark' : 'Bookmark this page',
-              icon: Icon(
-                  marked
-                      ? Icons.bookmark_rounded
-                      : Icons.bookmark_outline_rounded,
-                  color: marked ? const Color(0xFFFBBF24) : Colors.white),
-              onPressed: _isLoading || _error != null ? null : _toggleBookmark,
-            );
-          }),
+          if (widget.trackProgress)
+            Builder(builder: (context) {
+              final marked = LibraryService.instance
+                  .isBookmarked(widget.material.id, _currentPage);
+              return IconButton(
+                tooltip: marked ? 'Remove bookmark' : 'Bookmark this page',
+                icon: Icon(
+                    marked
+                        ? Icons.bookmark_rounded
+                        : Icons.bookmark_outline_rounded,
+                    color: marked ? const Color(0xFFFBBF24) : Colors.white),
+                onPressed:
+                    _isLoading || _error != null ? null : _toggleBookmark,
+              );
+            }),
         ],
       ),
       body: SafeArea(
@@ -292,24 +327,34 @@ class _PhysicalFlipbookReaderState extends State<PhysicalFlipbookReader> {
                   loadPage: _renderPage,
                   onPageChanged: _onPageChanged,
                 )
-              : PdfViewPinch(
-                  controller: _pinchController!,
-                  onPageChanged: _onPageChanged,
-                  backgroundDecoration:
-                      const BoxDecoration(color: Color(0xFF070D1E)),
-                  builders: PdfViewPinchBuilders<DefaultBuilderOptions>(
-                    options: const DefaultBuilderOptions(),
-                    documentLoaderBuilder: (_) => const Center(
-                      child:
-                          CircularProgressIndicator(color: Color(0xFF38BDF8)),
+              : _ownVerticalView
+                  ? VerticalPagesView(
+                      key: _verticalKey,
+                      pageCount: _pageCount,
+                      initialPage: _currentPage,
+                      aspectRatio: _pageAspect,
+                      loadPage: _renderPage,
+                      onPageChanged: _onPageChanged,
+                    )
+                  : PdfViewPinch(
+                      controller: _pinchController!,
+                      onPageChanged: _onPageChanged,
+                      backgroundDecoration:
+                          const BoxDecoration(color: Color(0xFF070D1E)),
+                      builders: PdfViewPinchBuilders<DefaultBuilderOptions>(
+                        options: const DefaultBuilderOptions(),
+                        documentLoaderBuilder: (_) => const Center(
+                          child: CircularProgressIndicator(
+                              color: Color(0xFF38BDF8)),
+                        ),
+                        pageLoaderBuilder: (_) => const Center(
+                          child: CircularProgressIndicator(
+                              color: Color(0xFF38BDF8)),
+                        ),
+                        errorBuilder: (_, error) =>
+                            _buildError(error.toString()),
+                      ),
                     ),
-                    pageLoaderBuilder: (_) => const Center(
-                      child:
-                          CircularProgressIndicator(color: Color(0xFF38BDF8)),
-                    ),
-                    errorBuilder: (_, error) => _buildError(error.toString()),
-                  ),
-                ),
         ),
         _buildBottomControls(),
       ],

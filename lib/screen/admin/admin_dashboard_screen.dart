@@ -5,12 +5,15 @@ import '../../models/user_session.dart';
 import '../../services/auth_service.dart';
 import '../../services/notification_service.dart';
 import '../../services/supabase_service.dart';
-import '../../models/learning_material.dart';
+import '../../models/department.dart';
+import '../../services/activity_service.dart';
 import '../account_settings_screen.dart';
-import '../syllabus_screen.dart';
 import '../teachers/teacher_notifications_screen.dart';
 import '../../services/admin_service.dart';
+import 'admin_activity_screen.dart';
 import 'bulk_import_screen.dart';
+import 'department_screen.dart';
+import 'material_preview.dart';
 import 'password_requests_screen.dart';
 import 'user_account_dialogs.dart';
 
@@ -27,8 +30,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   int _selectedIndex = 0;
   String _userSearch = '';
 
-  /// Materials tab view: 'pending', 'approved' or 'archived'.
+  /// Materials tab view: 'pending' or 'approved'.
   String _materialsView = 'pending';
+  late final Stream<List<Map<String, dynamic>>> _usersStream =
+      SupabaseService.client.from(SupabaseService.usersTable).stream(
+          primaryKey: ['id']).map((rows) => rows.cast<Map<String, dynamic>>());
+  late final Stream<List<Map<String, dynamic>>> _activityStream =
+      ActivityService.getAllActivity(limit: 50);
   late final Stream<List<Map<String, dynamic>>> _materialsStream =
       SupabaseService.client
           .from(SupabaseService.materialsTable)
@@ -93,9 +101,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   final List<String> _titles = [
-    'Dashboard',
+    'Homepage',
     'User Management',
     'Materials',
+    'Activity Logs',
     'Settings',
   ];
 
@@ -131,43 +140,95 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           ),
         ],
       ),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 1000),
-          child: IndexedStack(
-            index: _selectedIndex,
-            children: [
-              _buildOverviewTab(),
-              _buildUsersTab(),
-              _buildMaterialsTab(),
-              _buildSettingsTab(),
-            ],
-          ),
-        ),
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        onTap: (i) => setState(() => _selectedIndex = i),
-        backgroundColor: const Color(0xFF1C2541),
-        selectedItemColor: const Color(0xFFFBBF24),
-        unselectedItemColor: const Color(0xFF64748B),
-        type: BottomNavigationBarType.fixed,
-        items: [
-          const BottomNavigationBarItem(
-              icon: Icon(Icons.dashboard_outlined), label: 'Overview'),
-          BottomNavigationBarItem(
-              icon: Badge(
-                isLabelVisible: _totalRequests > 0,
-                label: Text('$_totalRequests'),
-                child: const Icon(Icons.people_outline),
+      body: Row(
+        children: [
+          _buildSideNav(),
+          const VerticalDivider(width: 1, color: Color(0xFF1E293B)),
+          Expanded(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1100),
+                child: IndexedStack(
+                  index: _selectedIndex,
+                  children: [
+                    _buildOverviewTab(),
+                    _buildUsersTab(),
+                    _buildMaterialsTab(),
+                    const AdminActivityScreen(embedded: true),
+                    _buildSettingsTab(),
+                  ],
+                ),
               ),
-              label: 'Users'),
-          const BottomNavigationBarItem(
-              icon: Icon(Icons.library_books_outlined), label: 'Materials'),
-          const BottomNavigationBarItem(
-              icon: Icon(Icons.settings_outlined), label: 'Settings'),
+            ),
+          ),
         ],
       ),
+    );
+  }
+
+  /// Tabs on the left; labels beside the icons on wide screens.
+  Widget _buildSideNav() {
+    final width = MediaQuery.sizeOf(context).width;
+    final wide = width >= 1000;
+    final narrow = width < 600; // phones: icons only
+    Widget badge(int count, IconData icon) => Badge(
+          isLabelVisible: count > 0,
+          label: Text('$count'),
+          child: Icon(icon),
+        );
+
+    return NavigationRail(
+      extended: wide,
+      minExtendedWidth: 210,
+      backgroundColor: const Color(0xFF1C2541),
+      selectedIndex: _selectedIndex,
+      onDestinationSelected: (i) => setState(() => _selectedIndex = i),
+      minWidth: narrow ? 56 : 72,
+      labelType: wide || narrow
+          ? NavigationRailLabelType.none
+          : NavigationRailLabelType.all,
+      indicatorColor: const Color(0xFFFBBF24).withValues(alpha: 0.18),
+      selectedIconTheme: const IconThemeData(color: Color(0xFFFBBF24)),
+      unselectedIconTheme: const IconThemeData(color: Color(0xFF64748B)),
+      selectedLabelTextStyle: const TextStyle(
+          color: Color(0xFFFBBF24), fontWeight: FontWeight.bold),
+      unselectedLabelTextStyle: const TextStyle(color: Color(0xFF94A3B8)),
+      leading: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: wide
+            ? const Row(children: [
+                Icon(Icons.auto_stories_rounded, color: Color(0xFFFBBF24)),
+                SizedBox(width: 8),
+                Text('Edushelf Admin',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15)),
+              ])
+            : const Icon(Icons.auto_stories_rounded, color: Color(0xFFFBBF24)),
+      ),
+      destinations: [
+        const NavigationRailDestination(
+            icon: Icon(Icons.dashboard_outlined),
+            selectedIcon: Icon(Icons.dashboard_rounded),
+            label: Text('Homepage')),
+        NavigationRailDestination(
+            icon: badge(_totalRequests, Icons.people_outline),
+            selectedIcon: badge(_totalRequests, Icons.people_rounded),
+            label: const Text('Users')),
+        const NavigationRailDestination(
+            icon: Icon(Icons.library_books_outlined),
+            selectedIcon: Icon(Icons.library_books_rounded),
+            label: Text('Materials')),
+        const NavigationRailDestination(
+            icon: Icon(Icons.insights_outlined),
+            selectedIcon: Icon(Icons.insights_rounded),
+            label: Text('Activity')),
+        const NavigationRailDestination(
+            icon: Icon(Icons.settings_outlined),
+            selectedIcon: Icon(Icons.settings_rounded),
+            label: Text('Settings')),
+      ],
     );
   }
 
@@ -176,58 +237,101 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   // ================================================
   Widget _buildOverviewTab() {
     return StreamBuilder<List<Map<String, dynamic>>>(
-      stream: SupabaseService.client.from(SupabaseService.usersTable).stream(
-          primaryKey: ['id']).map((rows) => rows.cast<Map<String, dynamic>>()),
+      stream: _usersStream,
       builder: (context, usersSnap) {
         return StreamBuilder<List<Map<String, dynamic>>>(
-          stream: SupabaseService.client
-              .from(SupabaseService.materialsTable)
-              .stream(primaryKey: ['id']).map(
-                  (rows) => rows.cast<Map<String, dynamic>>()),
+          stream: _materialsStream,
           builder: (context, materialsSnap) {
             final users = usersSnap.data ?? [];
             final materials = materialsSnap.data ?? [];
 
-            final userCount = users.length;
-            final materialCount = materials.length;
-
-            final pendingMaterials =
-                materials.where((m) => m['status'] == 'pending').length;
-            final approvedMaterials =
+            final students = users.where((u) => u['role'] == 'student').length;
+            final faculty =
+                users.where((u) => u['role'] == 'instructor').length;
+            final pending =
+                materials.where((m) => m['status'] == 'pending').toList();
+            final approved =
                 materials.where((m) => m['status'] == 'approved').length;
 
             final cards = [
-              _statCard('Total Users', '$userCount', Icons.people_alt_outlined,
-                  const Color(0xFF38BDF8)),
-              _statCard('Materials', '$materialCount', Icons.menu_book_outlined,
-                  const Color(0xFF10B981)),
-              _statCard('Pending Materials', '$pendingMaterials',
-                  Icons.hourglass_top_rounded, const Color(0xFFFBBF24)),
-              _statCard('Approved Materials', '$approvedMaterials',
-                  Icons.check_circle_outline, const Color(0xFF22C55E)),
+              _statCard('Total Users', '${users.length}',
+                  Icons.people_alt_outlined, const Color(0xFF38BDF8),
+                  detail: '$students students • $faculty faculty',
+                  onTap: () => setState(() => _selectedIndex = 1)),
+              _statCard('Materials', '${materials.length}',
+                  Icons.menu_book_outlined, const Color(0xFF10B981),
+                  detail: 'All departments',
+                  onTap: () => setState(() => _selectedIndex = 2)),
+              _statCard('Pending Review', '${pending.length}',
+                  Icons.hourglass_top_rounded, const Color(0xFFFBBF24),
+                  detail: pending.isEmpty ? 'All caught up' : 'Tap to review',
+                  onTap: () => setState(() {
+                        _selectedIndex = 2;
+                        _materialsView = 'pending';
+                      })),
+              _statCard('Approved', '$approved', Icons.check_circle_outline,
+                  const Color(0xFF22C55E),
+                  detail: 'Visible to students',
+                  onTap: () => setState(() {
+                        _selectedIndex = 2;
+                        _materialsView = 'approved';
+                      })),
             ];
 
             return ListView(
               padding: const EdgeInsets.all(20),
               children: [
-                const Text('Admin Overview',
-                    style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white)),
-                const SizedBox(height: 20),
-                GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: cards.length,
+                _buildWelcome(pending.length),
+                const SizedBox(height: 18),
+                GridView(
                   gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
                     maxCrossAxisExtent: 260,
-                    childAspectRatio: 1.6,
+                    mainAxisExtent: 112,
                     crossAxisSpacing: 12,
                     mainAxisSpacing: 12,
                   ),
-                  itemBuilder: (context, index) => cards[index],
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  children: cards,
                 ),
+                const SizedBox(height: 26),
+                _overviewHeading('Departments',
+                    'Open one to see its users, syllabus and materials'),
+                const SizedBox(height: 12),
+                GridView(
+                  gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                    maxCrossAxisExtent: 260,
+                    mainAxisExtent: 270,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                  ),
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  children: [
+                    for (final d in Department.all)
+                      _departmentCard(d, users, materials),
+                  ],
+                ),
+                const SizedBox(height: 26),
+                LayoutBuilder(builder: (context, c) {
+                  final review = _buildReviewPanel(pending);
+                  final activity = _buildActivityPanel();
+                  if (c.maxWidth < 760) {
+                    return Column(children: [
+                      review,
+                      const SizedBox(height: 16),
+                      activity,
+                    ]);
+                  }
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(child: review),
+                      const SizedBox(width: 16),
+                      Expanded(child: activity),
+                    ],
+                  );
+                }),
               ],
             );
           },
@@ -236,27 +340,343 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
-  Widget _statCard(String label, String count, IconData icon, Color color) {
+  Widget _buildWelcome(int pending) {
+    final hour = DateTime.now().hour;
+    final greeting = hour < 12
+        ? 'Good morning'
+        : hour < 18
+            ? 'Good afternoon'
+            : 'Good evening';
+    final first = widget.session.fullName.split(' ').first;
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF3A86FF), Color(0xFF7C3AED)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('$greeting, $first!',
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 21,
+                        fontWeight: FontWeight.bold)),
+                const SizedBox(height: 6),
+                Text(
+                    pending == 0
+                        ? 'No materials are waiting for review.'
+                        : '$pending material${pending == 1 ? ' is' : 's are'} '
+                            'waiting for your review.',
+                    style:
+                        const TextStyle(color: Colors.white70, fontSize: 13.5)),
+              ],
+            ),
+          ),
+          const Icon(Icons.auto_stories_rounded,
+              color: Colors.white24, size: 64),
+        ],
+      ),
+    );
+  }
+
+  Widget _overviewHeading(String title, String subtitle) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title,
+              style: const TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white)),
+          Text(subtitle,
+              style: const TextStyle(color: Color(0xFF64748B), fontSize: 12)),
+        ],
+      );
+
+  Widget _departmentCard(Department d, List<Map<String, dynamic>> users,
+      List<Map<String, dynamic>> materials) {
+    final people = users.where((u) => u['department'] == d.code);
+    final students = people.where((u) => u['role'] == 'student').length;
+    final faculty = people.where((u) => u['role'] == 'instructor').length;
+    final mats = materials.where((m) => m['program'] == d.code).length;
+
+    Widget stat(String n, String label) => Expanded(
+        child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Column(children: [
+              Text(n,
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15)),
+              Text(label,
+                  style: const TextStyle(
+                      color: Color(0xFF94A3B8), fontSize: 10.5)),
+            ])));
+
+    return Material(
+      color: const Color(0xFF1C2541),
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => DepartmentScreen(department: d)),
+        ),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: d.color.withValues(alpha: 0.45)),
+            gradient: LinearGradient(
+              colors: [d.color.withValues(alpha: 0.18), Colors.transparent],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ),
+          ),
+          child: Column(
+            children: [
+              Expanded(
+                child: Center(
+                  child: LayoutBuilder(
+                    builder: (context, c) => DepartmentLogo(
+                        dept: d,
+                        size: c.biggest.shortestSide.clamp(60.0, 130.0)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(d.code,
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold)),
+              Text(d.name,
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                      color: Color(0xFF94A3B8), fontSize: 11.5)),
+              const SizedBox(height: 10),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  stat('$students', 'Students'),
+                  stat('$faculty', 'Faculty'),
+                  stat('$mats', 'Materials'),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _panel(String title, IconData icon, Color color, String action,
+      VoidCallback onAction, List<Widget> children) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: const Color(0xFF1C2541),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Icon(icon, color: color, size: 24),
-          Text(count,
-              style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white)),
-          Text(label,
-              style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
+          Row(
+            children: [
+              Icon(icon, color: color, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(title,
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15)),
+              ),
+              TextButton(
+                onPressed: onAction,
+                child: Text(action, style: TextStyle(color: color)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          ...children,
         ],
+      ),
+    );
+  }
+
+  Widget _buildReviewPanel(List<Map<String, dynamic>> pending) {
+    return _panel(
+      'Waiting for review',
+      Icons.hourglass_top_rounded,
+      const Color(0xFFFBBF24),
+      'Review all',
+      () => setState(() {
+        _selectedIndex = 2;
+        _materialsView = 'pending';
+      }),
+      [
+        if (pending.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 16),
+            child: Text('All caught up!',
+                style: TextStyle(color: Color(0xFF94A3B8))),
+          ),
+        for (final m in pending.take(5))
+          ListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(
+                m['type'] == 'syllabus'
+                    ? Icons.table_chart_outlined
+                    : Icons.picture_as_pdf_outlined,
+                color: const Color(0xFF38BDF8)),
+            title: Text(m['title'] as String? ?? 'Untitled',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: Colors.white)),
+            subtitle: Text(
+                '${m['program'] ?? ''} • ${m['instructor'] ?? 'faculty'} • '
+                '${timeAgo(m['uploaded_at'])}',
+                style:
+                    const TextStyle(color: Color(0xFF94A3B8), fontSize: 11.5)),
+            trailing: IconButton(
+              tooltip: 'Preview',
+              icon: const Icon(Icons.visibility_outlined,
+                  color: Color(0xFF64748B)),
+              onPressed: () => previewMaterialRow(context, m),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildActivityPanel() {
+    return StreamBuilder<List<Map<String, dynamic>>>(
+      stream: _activityStream,
+      builder: (context, snap) {
+        final logs = snap.data ?? [];
+        return _panel(
+          'Recent activity',
+          Icons.insights_rounded,
+          const Color(0xFFF472B6),
+          'View all',
+          () => setState(() => _selectedIndex = 3),
+          [
+            if (logs.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                child: Text('No reading activity yet.',
+                    style: TextStyle(color: Color(0xFF94A3B8))),
+              ),
+            for (final r in logs.take(6))
+              ListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                leading: CircleAvatar(
+                  radius: 16,
+                  backgroundColor:
+                      const Color(0xFFF472B6).withValues(alpha: 0.15),
+                  child: Text(
+                      '${r['student_name'] ?? '?'}'.isEmpty
+                          ? '?'
+                          : '${r['student_name']}'[0].toUpperCase(),
+                      style: const TextStyle(
+                          color: Color(0xFFF472B6),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13)),
+                ),
+                title: Text(
+                    '${r['student_name'] ?? 'A student'} • '
+                    '${_actionText(r['action'])} ${r['material_code'] ?? ''}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: Colors.white)),
+                subtitle: Text(
+                    '${r['department'] ?? ''} • ${timeAgo(r['created_at'])}',
+                    style: const TextStyle(
+                        color: Color(0xFF94A3B8), fontSize: 11.5)),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
+  static String _actionText(Object? action) => switch (action) {
+        'open' => 'opened',
+        'read' => 'is reading',
+        'progress' => 'stopped reading',
+        'bookmark' => 'bookmarked a page in',
+        'unbookmark' => 'removed a bookmark in',
+        'download' => 'downloaded',
+        _ => 'used',
+      };
+
+  Widget _statCard(String label, String count, IconData icon, Color color,
+      {required String detail, required VoidCallback onTap}) {
+    return Material(
+      color: const Color(0xFF1C2541),
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: color.withValues(alpha: 0.3)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: color, size: 26),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(count,
+                        style: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white)),
+                    Text(label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 12.5,
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600)),
+                    Text(detail,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 11, color: Color(0xFF94A3B8))),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -566,9 +986,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 ButtonSegment(
                     value: 'approved',
                     label: Text('Approved (${count('approved')})')),
-                ButtonSegment(
-                    value: 'archived',
-                    label: Text('Archived (${count('archived')})')),
               ],
               selected: {_materialsView},
               onSelectionChanged: (v) =>
@@ -579,10 +996,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               switch (_materialsView) {
                 'pending' => 'Waiting for review. Approve to publish, or '
                     'send back for revision.',
-                'approved' => 'Visible to students. Archive to take one '
-                    'down without deleting it.',
-                _ => 'Hidden from students. Restore to publish again, or '
-                    'delete permanently.',
+                _ => 'Visible to students. Tap the eye to preview one.',
               },
               style: const TextStyle(color: Color(0xFF64748B), fontSize: 12),
             ),
@@ -593,8 +1007,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 child: Text(
                   switch (_materialsView) {
                     'pending' => 'Nothing to review right now.',
-                    'approved' => 'No approved materials yet.',
-                    _ => 'The archive is empty.',
+                    _ => 'No approved materials yet.',
                   },
                   textAlign: TextAlign.center,
                   style: const TextStyle(color: Color(0xFF94A3B8)),
@@ -650,20 +1063,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             fontWeight: FontWeight.bold,
                             fontSize: 14)),
                   ),
-                  if (isSyllabus)
-                    IconButton(
-                      tooltip: 'Preview syllabus',
-                      visualDensity: VisualDensity.compact,
-                      icon: const Icon(Icons.visibility_outlined,
-                          color: Color(0xFF38BDF8)),
-                      onPressed: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => SyllabusScreen(
-                              material: LearningMaterial.fromRow(m)),
-                        ),
-                      ),
-                    ),
+                  IconButton(
+                    tooltip:
+                        isSyllabus ? 'Preview syllabus' : 'Preview material',
+                    visualDensity: VisualDensity.compact,
+                    icon: const Icon(Icons.visibility_outlined,
+                        color: Color(0xFF38BDF8)),
+                    onPressed: () => previewMaterialRow(context, m),
+                  ),
                 ],
               ),
               const SizedBox(height: 4),
@@ -677,39 +1084,22 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       const TextStyle(color: Color(0xFF64748B), fontSize: 11)),
               const SizedBox(height: 10),
               Row(
-                children: switch (status) {
-                  'pending' => [
-                      action('Approve', Icons.check, const Color(0xFF22C55E),
-                          Colors.white, () => _approveMaterial(m)),
-                      const SizedBox(width: 8),
-                      action('Revise', Icons.edit_note, const Color(0xFFFBBF24),
-                          Colors.black, () => _rejectMaterial(m)),
-                    ],
-                  'approved' => [
-                      action(
-                          'Archive',
-                          Icons.archive_outlined,
-                          const Color(0xFF334155),
-                          Colors.white,
-                          () => _archiveMaterial(m)),
-                    ],
-                  _ => [
-                      action(
-                          'Restore',
-                          Icons.unarchive_outlined,
-                          const Color(0xFF22C55E),
-                          Colors.white,
-                          () => _setMaterialStatus(m, 'approved',
-                              done: 'Restored. Students can see it again.')),
-                      const SizedBox(width: 8),
-                      action(
-                          'Delete permanently',
-                          Icons.delete_forever,
-                          const Color(0xFFEF4444),
-                          Colors.white,
-                          () => _deleteMaterial(m)),
-                    ],
-                },
+                children: [
+                  if (status == 'pending') ...[
+                    action('Approve', Icons.check, const Color(0xFF22C55E),
+                        Colors.white, () => _approveMaterial(m)),
+                    const SizedBox(width: 8),
+                    action('Revise', Icons.edit_note, const Color(0xFFFBBF24),
+                        Colors.black, () => _rejectMaterial(m)),
+                    const SizedBox(width: 8),
+                  ],
+                  IconButton(
+                    tooltip: 'Delete',
+                    icon: const Icon(Icons.delete_outline,
+                        color: Color(0xFFEF4444)),
+                    onPressed: () => _deleteMaterial(m),
+                  ),
+                ],
               ),
             ],
           ),
@@ -726,55 +1116,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
         content: Text('Approved. It is now in the Approved list and visible '
             'to students.')));
-  }
-
-  Future<void> _archiveMaterial(Map<String, dynamic> m) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1C2541),
-        title: const Text('Archive material?',
-            style: TextStyle(color: Colors.white)),
-        content: Text(
-            '"${m['title']}" will be hidden from students. You can restore '
-            'it from the Archived list at any time.',
-            style: const TextStyle(color: Color(0xFF94A3B8))),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel',
-                style: TextStyle(color: Color(0xFF94A3B8))),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFFBBF24),
-                foregroundColor: Colors.black),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Archive'),
-          ),
-        ],
-      ),
-    );
-    if (ok != true) return;
-    await _setMaterialStatus(m, 'archived',
-        done: 'Archived. Find it under Archived to restore it.');
-  }
-
-  Future<void> _setMaterialStatus(Map<String, dynamic> m, String status,
-      {required String done}) async {
-    try {
-      await SupabaseService.client
-          .from(SupabaseService.materialsTable)
-          .update({'status': status}).eq('id', m['id']);
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('Could not save. Check your connection.')));
-      }
-      return;
-    }
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(done)));
   }
 
   Future<void> _updateMaterialStatus(
@@ -906,7 +1247,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     ).whenComplete(controller.dispose);
   }
 
-  /// Only from the archive: removes the material and its file for good.
+  /// Removes the material and its file for good, after asking.
   Future<void> _deleteMaterial(Map<String, dynamic> m) async {
     final ok = await showDialog<bool>(
       context: context,
@@ -915,8 +1256,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         title: const Text('Delete permanently?',
             style: TextStyle(color: Colors.white)),
         content: Text(
-            '"${m['title']}" and its file will be deleted for good. This '
-            'cannot be undone.',
+            '"${m['title']}" and its file will be deleted for good, and '
+            'students will no longer see it. This cannot be undone.',
             style: const TextStyle(color: Color(0xFF94A3B8))),
         actions: [
           TextButton(
@@ -984,13 +1325,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     builder: (_) =>
                         AccountSettingsScreen(session: widget.session)))),
         _adminTile(
-            'Seed Demo Materials',
-            'Add sample materials for testing',
-            Icons.cloud_upload_outlined,
-            const Color(0xFF10B981),
-            _seedDemoMaterials),
-        _adminTile('Activity Logs', 'View all user activity',
-            Icons.receipt_long_outlined, const Color(0xFF818CF8), () {}),
+            'Activity Logs',
+            'What students open, read, bookmark and download',
+            Icons.receipt_long_outlined,
+            const Color(0xFF818CF8),
+            () => setState(() => _selectedIndex = 3)),
         _adminTile('System Info', 'Version and system details',
             Icons.info_outline, const Color(0xFFFBBF24), () {
           showDialog(
@@ -1000,7 +1339,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               title:
                   const Text('Edushelf', style: TextStyle(color: Colors.white)),
               content: const Text(
-                  'Version 1.0.0\nAdmin Dashboard\nCollege of Accountancy, Business Management, and Information Technology',
+                  'Version 1.0.0\nAdmin Homepage\nCollege of Accountancy, Business Management, and Information Technology',
                   style: TextStyle(color: Color(0xFF94A3B8))),
               actions: [
                 TextButton(
@@ -1012,46 +1351,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           );
         }),
       ],
-    );
-  }
-
-  Future<void> _seedDemoMaterials() async {
-    final materials = [
-      {
-        'title': 'Data Structures & Algorithms in Java',
-        'code': 'IT 201',
-        'program': 'BSIT',
-        'year': '2nd Year',
-        'term': '1st Sem',
-        'instructor': 'Prof. E. Cruz, MSCS',
-        'type': 'learning_material',
-        'status': 'pending',
-        'uploaded_by': 'IT-T-00001',
-      },
-      {
-        'title': 'Information Assurance & Cybersecurity',
-        'code': 'IT 305',
-        'program': 'BSIT',
-        'year': '3rd Year',
-        'term': '2nd Sem',
-        'instructor': 'Prof. N. Ramos, MIT',
-        'type': 'syllabus',
-        'status': 'pending',
-        'uploaded_by': 'IT-T-00001',
-      },
-    ];
-
-    for (final m in materials) {
-      await SupabaseService.client
-          .from(SupabaseService.materialsTable)
-          .insert(m);
-    }
-
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-          content: Text('Demo materials seeded!'),
-          backgroundColor: Color(0xFF10B981)),
     );
   }
 

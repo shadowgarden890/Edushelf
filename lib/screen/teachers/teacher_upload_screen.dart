@@ -1,4 +1,6 @@
+import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../../models/user_session.dart';
 import 'syllabus_editor_screen.dart';
@@ -379,46 +381,49 @@ class _TeacherUploadScreenState extends State<TeacherUploadScreen> {
   // DROP ZONE
   // ================================================
   Widget _buildDropZone() {
-    return DragTarget<PlatformFile>(
-      onWillAcceptWithDetails: (details) {
-        setState(() => _isDragging = true);
-        return true;
-      },
-      onLeave: (_) {
+    // Accepts files dragged from File Explorer / Finder (desktop), as well
+    // as picking with Browse Files.
+    return DropTarget(
+      onDragEntered: (_) => setState(() => _isDragging = true),
+      onDragExited: (_) => setState(() => _isDragging = false),
+      onDragDone: (details) async {
         setState(() => _isDragging = false);
-      },
-      onAcceptWithDetails: (details) {
-        final file = details.data;
-        if (UploadService.isPdf(file)) {
-          setState(() {
-            _selectedFile = file;
-            _isDragging = false;
-          });
-        } else {
-          _showMessage('Only PDF files are allowed.', isError: true);
+        if (details.files.isEmpty) return;
+        if (details.files.length > 1) {
+          _showMessage('Drop one PDF at a time.', isError: true);
+          return;
         }
-      },
-      builder: (context, candidateData, rejectedData) {
-        return AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          height: 200,
-          decoration: BoxDecoration(
-            color: _isDragging
-                ? const Color(0xFF3A86FF).withValues(alpha: 0.15)
-                : const Color(0xFF1C2541),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: _isDragging
-                  ? const Color(0xFF38BDF8)
-                  : const Color(0xFF334155),
-              width: _isDragging ? 2 : 1,
-            ),
-          ),
-          child: _selectedFile == null
-              ? _buildEmptyDropContent()
-              : _buildSelectedFileContent(),
+        final dropped = details.files.first;
+        final file = PlatformFile(
+          name: dropped.name,
+          size: await dropped.length(),
+          path: kIsWeb ? null : dropped.path,
+          bytes: kIsWeb ? await dropped.readAsBytes() : null,
         );
+        if (!UploadService.isPdf(file)) {
+          _showMessage('Only PDF files are allowed.', isError: true);
+          return;
+        }
+        setState(() => _selectedFile = file);
       },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        height: 200,
+        decoration: BoxDecoration(
+          color: _isDragging
+              ? const Color(0xFF3A86FF).withValues(alpha: 0.15)
+              : const Color(0xFF1C2541),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color:
+                _isDragging ? const Color(0xFF38BDF8) : const Color(0xFF334155),
+            width: _isDragging ? 2 : 1,
+          ),
+        ),
+        child: _selectedFile == null
+            ? _buildEmptyDropContent()
+            : _buildSelectedFileContent(),
+      ),
     );
   }
 

@@ -46,8 +46,7 @@ class _SyllabusScreenState extends State<SyllabusScreen> {
 
   /// Syllabi entered as content (courses by semester), or tables read
   /// from an older PDF one; other PDFs are shown as text.
-  SyllabusContent? get _content =>
-      widget.material.syllabusContent ?? _fromPdf;
+  SyllabusContent? get _content => widget.material.syllabusContent ?? _fromPdf;
 
   @override
   void initState() {

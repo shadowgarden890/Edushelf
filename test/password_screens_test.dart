@@ -1,5 +1,3 @@
-import 'package:edushelf_reading_application/models/user_session.dart';
-import 'package:edushelf_reading_application/screen/force_password_change_screen.dart';
 import 'package:edushelf_reading_application/screen/forgot_password_screen.dart';
 import 'package:edushelf_reading_application/screen/login_screen.dart';
 import 'package:flutter/material.dart';
@@ -49,36 +47,5 @@ void main() {
 
     expect(find.text('Use your recovery password'), findsOneWidget);
     expect(find.text('Request sent'), findsNothing);
-  });
-
-  testWidgets('first-login screen rejects reusing the temporary password',
-      (tester) async {
-    var changed = false;
-    await tester.pumpWidget(MaterialApp(
-      home: ForcePasswordChangeScreen(
-        session: UserSession(
-            idNumber: 'IT-23-01003',
-            fullName: 'Juan Dela Cruz',
-            role: 'student',
-            department: 'BSIT'),
-        temporaryPassword: 'Read-4827-km',
-        onChanged: () => changed = true,
-      ),
-    ));
-
-    expect(find.text('Welcome, Juan Dela Cruz!'), findsOneWidget);
-    final fields = find.byType(TextFormField);
-    await tester.enterText(fields.at(0), 'Read-4827-km');
-    await tester.enterText(fields.at(1), 'Read-4827-km');
-    await tester.tap(find.text('Set password and continue'));
-    await tester.pump();
-    expect(find.text('Choose a different password'), findsOneWidget);
-
-    await tester.enterText(fields.at(0), 'mynewpass');
-    await tester.enterText(fields.at(1), 'different');
-    await tester.tap(find.text('Set password and continue'));
-    await tester.pump();
-    expect(find.text('Passwords do not match'), findsOneWidget);
-    expect(changed, isFalse);
   });
 }

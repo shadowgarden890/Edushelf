@@ -34,7 +34,11 @@ class _DownloadedPagesViewerState extends State<DownloadedPagesViewer> {
     _controller = PageController(initialPage: _index);
     _resolveFiles();
     LibraryService.instance.recordAccess(widget.material);
+    _markRead(_index);
   }
+
+  void _markRead(int index) => LibraryService.instance
+      .saveProgress(widget.material, widget.pages[index]);
 
   Future<void> _resolveFiles() async {
     for (final page in widget.pages) {
@@ -79,7 +83,10 @@ class _DownloadedPagesViewerState extends State<DownloadedPagesViewer> {
               child: PageView.builder(
                 controller: _controller,
                 itemCount: widget.pages.length,
-                onPageChanged: (i) => setState(() => _index = i),
+                onPageChanged: (i) {
+                  setState(() => _index = i);
+                  _markRead(i);
+                },
                 itemBuilder: (_, i) {
                   final file = _files[widget.pages[i]];
                   if (file == null) {

@@ -151,6 +151,10 @@ class AdminService {
         'p_contact': contact.trim(),
       });
 
+  /// Frees an account that is signed in on a device (e.g. a lost phone).
+  static Future<String?> releaseDevice(String idNumber) =>
+      _call('admin_release_device', {'p_id_number': idNumber});
+
   static Future<String?> _call(
       String function, Map<String, dynamic> params) async {
     try {

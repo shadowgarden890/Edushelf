@@ -296,6 +296,58 @@ class _EditUserDialogState extends State<_EditUserDialog> {
     }
   }
 
+  bool _deviceReleased = false;
+
+  /// Where the account is signed in, with a way to sign that device out
+  /// (only one device can use an account at a time).
+  Widget _buildDeviceRow() {
+    final device = widget.user['active_device_name'] as String?;
+    final seen =
+        DateTime.tryParse(widget.user['active_seen_at'] as String? ?? '');
+    final inUse = !_deviceReleased &&
+        device != null &&
+        seen != null &&
+        DateTime.now().difference(seen.toLocal()) < const Duration(minutes: 10);
+    if (!inUse) return const SizedBox.shrink();
+
+    return Container(
+      margin: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.fromLTRB(12, 6, 6, 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFF22C55E).withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.devices_rounded, size: 18, color: Color(0xFF22C55E)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text('Signed in on $device',
+                style: const TextStyle(color: Colors.white, fontSize: 12.5)),
+          ),
+          TextButton(
+            onPressed: _releaseDevice,
+            child: const Text('Sign out of device',
+                style: TextStyle(color: Color(0xFFEF4444), fontSize: 12.5)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _releaseDevice() async {
+    final error = await AdminService.releaseDevice(_idNumber);
+    if (!mounted) return;
+    if (error != null) {
+      setState(() => _error = error);
+      return;
+    }
+    setState(() => _deviceReleased = true);
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Signed out. The account can now sign in on another '
+            'device; the old device is signed out within 2 minutes.')));
+  }
+
   @override
   Widget build(BuildContext context) {
     final role = widget.user['role'] as String? ?? 'student';
@@ -321,6 +373,7 @@ class _EditUserDialogState extends State<_EditUserDialog> {
                     fontSize: 15)),
             Text('${_roleName(role)} • $dept',
                 style: const TextStyle(color: _muted, fontSize: 12)),
+            _buildDeviceRow(),
             const SizedBox(height: 16),
             _textField(
               controller: _name,

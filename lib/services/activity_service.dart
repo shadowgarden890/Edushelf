@@ -50,6 +50,19 @@ class ActivityService {
   }
 
   // ================================================
+  // STREAM — ALL ACTIVITY (admin view)
+  // ================================================
+  /// Real-time stream of the most recent activity in every department.
+  static Stream<List<Map<String, dynamic>>> getAllActivity({int limit = 1000}) {
+    return SupabaseService.client
+        .from(SupabaseService.activityLogsTable)
+        .stream(primaryKey: ['id'])
+        .order('created_at', ascending: false)
+        .limit(limit)
+        .map((rows) => rows.cast<Map<String, dynamic>>());
+  }
+
+  // ================================================
   // STREAM — ACTIVITY BY STUDENT
   // ================================================
   /// Real-time stream of one student's activity.

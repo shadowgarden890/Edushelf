@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/user_session.dart';
 import '../services/auth_service.dart';
-import 'force_password_change_screen.dart';
 import 'forgot_password_screen.dart';
 import 'student/student_home_screen.dart';
 import 'teachers/teacher_shell.dart';
@@ -74,27 +73,17 @@ class _LoginScreenState extends State<LoginScreen> {
         );
     }
 
-    void openApp(BuildContext ctx) => Navigator.pushReplacement(
-          ctx,
-          MaterialPageRoute(builder: (_) => destination),
-        );
-
-    // Temporary password from the admin: set a real one first.
+    // Still on the admin's temporary password: a reminder only; it can be
+    // changed any time in Settings.
     if (result['mustChangePassword'] == true) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (ctx) => ForcePasswordChangeScreen(
-            session: session,
-            temporaryPassword: password,
-            onChanged: () => openApp(ctx),
-          ),
-        ),
-      );
-      return;
+      _showMessage('Tip: you can change your password any time in '
+          'Settings.');
     }
 
-    openApp(context);
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => destination),
+    );
   }
 
   void _showMessage(String msg, {bool isError = false}) {

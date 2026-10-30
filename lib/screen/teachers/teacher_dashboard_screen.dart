@@ -175,11 +175,6 @@ class TeacherDashboardScreen extends StatelessWidget {
             ? 'Returned for revision'
             : 'Returned for revision: $notes';
         break;
-      case 'archived':
-        color = const Color(0xFF94A3B8);
-        icon = Icons.archive_outlined;
-        subtitle = 'Archived by administrator (hidden from students)';
-        break;
       default:
         color = const Color(0xFF38BDF8);
         icon = Icons.cloud_done_rounded;

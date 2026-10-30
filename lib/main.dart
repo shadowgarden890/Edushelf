@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'screen/login_screen.dart';
+import 'services/auth_service.dart';
+import 'services/device_session.dart';
 import 'web_pdf_registry.dart'
     if (dart.library.io) 'web_pdf_registry_stub.dart';
 
@@ -19,7 +21,24 @@ Future<void> main() async {
     publishableKey: supabasePublishableKey,
   );
 
+  DeviceSession.instance.onSignedOutElsewhere = _signedOutElsewhere;
+
   runApp(const EduShelfApp());
+}
+
+final _navigatorKey = GlobalKey<NavigatorState>();
+final _messengerKey = GlobalKey<ScaffoldMessengerState>();
+
+/// This device lost its claim on the account (signed in elsewhere, or
+/// signed out by the admin): back to the login screen.
+Future<void> _signedOutElsewhere() async {
+  await AuthService.logout();
+  _navigatorKey.currentState?.pushNamedAndRemoveUntil('/login', (_) => false);
+  _messengerKey.currentState?.showSnackBar(const SnackBar(
+    duration: Duration(seconds: 8),
+    content: Text('You were signed out because this account is now being '
+        'used on another device, or the administrator signed it out.'),
+  ));
 }
 
 class EduShelfApp extends StatelessWidget {
@@ -28,6 +47,8 @@ class EduShelfApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: _navigatorKey,
+      scaffoldMessengerKey: _messengerKey,
       title: 'Edushelf',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(

@@ -191,7 +191,7 @@ class BookCoverCard extends StatelessWidget {
                     ),
 
                     // Progress bar
-                    if (material.currentPage > 0)
+                    if (material.readPages.isNotEmpty)
                       Positioned(
                         bottom: 0,
                         left: 0,
@@ -223,11 +223,11 @@ class BookCoverCard extends StatelessWidget {
                   fontSize: 12.5),
             ),
             Text(
-              material.currentPage == 0
+              material.readPages.isEmpty
                   ? 'Unread'
-                  : 'Page ${material.currentPage} / ${material.totalPages} (${material.progressPercent}%)',
+                  : '${material.readPages.length} / ${material.totalPages} pages read (${material.progressPercent}%)',
               style: TextStyle(
-                color: material.currentPage == 0
+                color: material.readPages.isEmpty
                     ? const Color(0xFF64748B)
                     : const Color(0xFF38BDF8),
                 fontSize: 11,

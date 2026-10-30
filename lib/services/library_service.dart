@@ -39,8 +39,10 @@ class LibraryEntry {
 
   bool get hasDownloads => isFullyDownloaded || downloadedPages.isNotEmpty;
 
-  /// My Library: everything downloaded, plus materials saved with the heart.
-  bool get isInLibrary => isFavorite || hasDownloads;
+  /// My Library: materials saved with the heart. Downloading hearts a
+  /// material; un-hearting removes it from My Library but keeps the
+  /// download on the device (it still shows in History).
+  bool get isInLibrary => isFavorite;
 
   bool get isInHistory => lastAccessedAt != null || hasDownloads;
 
@@ -165,10 +167,14 @@ class LibraryService extends ChangeNotifier {
     await _save();
   }
 
-  /// Saves where the student stopped reading (survives app restarts).
+  /// Records that the student opened [page]: it counts as read and is
+  /// where "Resume" continues (survives app restarts).
   Future<void> saveProgress(LearningMaterial material, int page) async {
-    material.currentPage = page;
-    _ensureEntry(material).material.currentPage = page;
+    final saved = _ensureEntry(material).material;
+    for (final m in {material, saved}) {
+      m.currentPage = page;
+      m.readPages.add(page);
+    }
     notifyListeners();
     await _save();
   }
@@ -205,9 +211,19 @@ class LibraryService extends ChangeNotifier {
     await _save();
   }
 
+  /// The first download of a material also saves it to My Library.
+  void _heartOnFirstDownload(LibraryEntry entry, DateTime now) {
+    if (entry.hasDownloads || entry.isFavorite) return;
+    entry
+      ..isFavorite = true
+      ..favoritedAt = now;
+  }
+
   Future<void> markFullDownloaded(LearningMaterial material) async {
     final now = DateTime.now();
-    _ensureEntry(material)
+    final entry = _ensureEntry(material);
+    _heartOnFirstDownload(entry, now);
+    entry
       ..isFullyDownloaded = true
       ..downloadedAt = now
       ..lastAccessedAt = now;
@@ -217,7 +233,9 @@ class LibraryService extends ChangeNotifier {
 
   Future<void> markPageDownloaded(LearningMaterial material, int page) async {
     final now = DateTime.now();
-    _ensureEntry(material)
+    final entry = _ensureEntry(material);
+    _heartOnFirstDownload(entry, now);
+    entry
       ..downloadedPages.add(page)
       ..downloadedAt = now
       ..lastAccessedAt = now;
@@ -225,6 +243,8 @@ class LibraryService extends ChangeNotifier {
     await _save();
   }
 
+  /// Removes the downloaded files and starts the material over: reading
+  /// progress and bookmarks are cleared too.
   Future<void> deleteDownloads(String materialId) async {
     final entry = _entries[materialId];
     if (entry == null) return;
@@ -234,6 +254,9 @@ class LibraryService extends ChangeNotifier {
 
     entry.isFullyDownloaded = false;
     entry.downloadedPages.clear();
+    entry.bookmarks.clear();
+    entry.material.currentPage = 0;
+    entry.material.readPages.clear();
     _dropIfEmpty(materialId);
     notifyListeners();
     await _save();

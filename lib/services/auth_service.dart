@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/user_session.dart';
+import 'device_session.dart';
 import 'supabase_service.dart';
 
 class AuthService {
@@ -183,14 +184,17 @@ class AuthService {
         return {'success': false, 'message': 'Account profile not found.'};
       }
 
+      // One device per account: refuse while another device uses it.
+      final blocked = await DeviceSession.instance.claim();
+      if (blocked != null) {
+        await SupabaseService.client.auth.signOut();
+        return {'success': false, 'message': blocked};
+      }
+
       final session = UserSession.fromMap(profile);
       final mustChange = profile['must_change_password'] == true;
 
-      // A temporary password must not unlock offline login; the cache is
-      // saved once the user has set their own password.
-      if (!mustChange) {
-        await _saveOfflineCredentials(session: session, password: pass);
-      }
+      await _saveOfflineCredentials(session: session, password: pass);
 
       return {
         'success': true,
@@ -331,6 +335,7 @@ class AuthService {
   // LOGOUT
   // ================================================
   static Future<void> logout() async {
+    await DeviceSession.instance.release();
     try {
       await SupabaseService.client.auth.signOut();
     } catch (_) {

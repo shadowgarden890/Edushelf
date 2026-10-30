@@ -1,8 +1,10 @@
--- Lets the admin archive approved materials instead of deleting them.
--- Archived materials are hidden from students (the materials select
--- policy only shows 'approved' ones to them) and can be restored.
+-- Undoes the archive feature (20261029): archived materials go back to
+-- approved, and the status check no longer allows 'archived'.
+-- Safe to run whether or not 20261029 was run.
 
--- Drop any earlier check on materials.status, whatever it was named.
+update public.materials set status = 'approved' where status = 'archived';
+
+-- Drop any check on materials.status, whatever it was named.
 do $$
 declare
   c record;
@@ -24,4 +26,4 @@ end $$;
 
 alter table public.materials
   add constraint materials_status_check
-  check (status in ('pending', 'approved', 'rejected', 'archived'));
+  check (status in ('pending', 'approved', 'rejected'));

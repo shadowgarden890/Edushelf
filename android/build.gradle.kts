@@ -35,6 +35,19 @@ subprojects {
     }
 }
 
+// desktop_drop (drag-and-drop on desktop; unused on phones) sets Java 1.8
+// in its own build file, which clashes with Kotlin 17 above. Its Kotlin
+// is compiled for 1.8 to match.
+gradle.projectsEvaluated {
+    project(":desktop_drop").tasks
+        .withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>()
+        .configureEach {
+            compilerOptions {
+                jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_1_8)
+            }
+        }
+}
+
 tasks.register<Delete>("clean") {
     delete(rootProject.layout.buildDirectory)
 }

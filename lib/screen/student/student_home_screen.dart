@@ -31,6 +31,9 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
   int _unreadNotifications = 0;
   StreamSubscription<List<Map<String, dynamic>>>? _notificationsSub;
   String _selectedYear = 'All Years';
+
+  /// Browse filter: 'all', 'materials' (reading materials) or 'syllabus'.
+  String _selectedType = 'all';
   String _searchQuery = '';
   String _librarySearchQuery = '';
   bool _isOnline = true;
@@ -96,6 +99,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
       if (saved != null) {
         material.totalPages = saved.totalPages;
         material.currentPage = saved.currentPage;
+        material.readPages.addAll(saved.readPages);
       }
       return material;
     }).toList();
@@ -133,8 +137,13 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
     final wasFavorite = _library.isFavorite(material.id);
     await _library.toggleFavorite(material);
     if (!mounted) return;
-    _snack(
-        wasFavorite ? 'Removed from your library.' : 'Saved to your library.');
+    final downloaded = _library.entryFor(material.id)?.hasDownloads == true;
+    _snack(!wasFavorite
+        ? 'Saved to your library.'
+        : downloaded
+            ? 'Removed from your library. The download stays on this '
+                'device (find it in History).'
+            : 'Removed from your library.');
   }
 
   void _downloadFull(LearningMaterial material) {
@@ -337,7 +346,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
     );
   }
 
-  // TAB 0: MY LIBRARY — hearted or downloaded materials (works offline)
+  // TAB 0: MY LIBRARY — hearted materials (downloading hearts one; works offline)
   Widget _buildMyLibraryTab() {
     final materials = _library.entries.map((e) => e.material).toList();
     final filtered = materials.where((m) {
@@ -707,16 +716,23 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
     }
 
     final filtered = materials.where((item) {
-      // A syllabus covers every year, so it shows under any year filter.
-      final matchYear = _selectedYear == 'All Years' ||
+      // A syllabus covers every year, so it shows under any year filter,
+      // and the year filter doesn't apply when only syllabi are shown.
+      final matchYear = _selectedType == 'syllabus' ||
+          _selectedYear == 'All Years' ||
           item.year == _selectedYear ||
           item.year == 'All Years';
+      final matchType = switch (_selectedType) {
+        'materials' => !item.isSyllabus,
+        'syllabus' => item.isSyllabus,
+        _ => true,
+      };
       final matchSearch = item.title
               .toLowerCase()
               .contains(_searchQuery.toLowerCase()) ||
           item.code.toLowerCase().contains(_searchQuery.toLowerCase()) ||
           item.instructor.toLowerCase().contains(_searchQuery.toLowerCase());
-      return matchYear && matchSearch;
+      return matchType && matchYear && matchSearch;
     }).toList();
 
     return ListView(
@@ -738,34 +754,54 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
           ),
         ),
         const SizedBox(height: 14),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: [
-              'All Years',
-              '1st Year',
-              '2nd Year',
-              '3rd Year',
-              '4th Year'
-            ].map((year) {
-              final isSel = _selectedYear == year;
-              return Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: FilterChip(
-                  label: Text(year),
-                  selected: isSel,
-                  selectedColor: const Color(0xFF475569),
-                  backgroundColor: const Color(0xFF1C2541),
-                  labelStyle: TextStyle(
-                    color: isSel ? Colors.white : const Color(0xFF94A3B8),
-                    fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
-                  ),
-                  onSelected: (_) => setState(() => _selectedYear = year),
-                ),
-              );
-            }).toList(),
+        SegmentedButton<String>(
+          showSelectedIcon: false,
+          expandedInsets: EdgeInsets.zero,
+          style: SegmentedButton.styleFrom(
+            foregroundColor: const Color(0xFF94A3B8),
+            selectedForegroundColor: Colors.white,
+            selectedBackgroundColor: const Color(0xFF3A86FF),
+            side: const BorderSide(color: Color(0xFF334155)),
           ),
+          segments: const [
+            ButtonSegment(value: 'all', label: Text('All')),
+            ButtonSegment(value: 'materials', label: Text('Reading Materials')),
+            ButtonSegment(value: 'syllabus', label: Text('Syllabus')),
+          ],
+          selected: {_selectedType},
+          onSelectionChanged: (v) => setState(() => _selectedType = v.first),
         ),
+        // A syllabus covers every year level, so it has no year filter.
+        if (_selectedType != 'syllabus') const SizedBox(height: 12),
+        if (_selectedType != 'syllabus')
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                'All Years',
+                '1st Year',
+                '2nd Year',
+                '3rd Year',
+                '4th Year'
+              ].map((year) {
+                final isSel = _selectedYear == year;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: FilterChip(
+                    label: Text(year),
+                    selected: isSel,
+                    selectedColor: const Color(0xFF475569),
+                    backgroundColor: const Color(0xFF1C2541),
+                    labelStyle: TextStyle(
+                      color: isSel ? Colors.white : const Color(0xFF94A3B8),
+                      fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
+                    ),
+                    onSelected: (_) => setState(() => _selectedYear = year),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
         const SizedBox(height: 20),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,

@@ -13,7 +13,13 @@ class LearningMaterial {
 
   /// 0 until the PDF has been opened once and its page count is known.
   int totalPages;
+
+  /// The last page the student was on (for "Resume").
   int currentPage;
+
+  /// Pages the student has actually opened. Progress counts these, so
+  /// skipping ahead doesn't mark the pages in between as read.
+  final Set<int> readPages;
   final List<Color> coverGradient;
   final String description;
   final bool isSyllabus;
@@ -41,10 +47,13 @@ class LearningMaterial {
     this.fileUrl,
     this.uploadedBy,
     this.syllabusContent,
-  });
+    Set<int>? readPages,
+  }) : readPages = readPages ?? <int>{};
 
-  double get progress =>
-      totalPages == 0 ? 0.0 : (currentPage / totalPages).clamp(0.0, 1.0);
+  double get progress => totalPages == 0
+      ? 0.0
+      : (readPages.where((p) => p <= totalPages).length / totalPages)
+          .clamp(0.0, 1.0);
 
   int get progressPercent => (progress * 100).toInt();
 
@@ -89,6 +98,7 @@ class LearningMaterial {
         'instructor': instructor,
         'totalPages': totalPages,
         'currentPage': currentPage,
+        'readPages': readPages.toList()..sort(),
         'description': description,
         'isSyllabus': isSyllabus,
         'fileUrl': fileUrl,
@@ -108,6 +118,7 @@ class LearningMaterial {
       instructor: json['instructor'] as String? ?? '',
       totalPages: json['totalPages'] as int? ?? 0,
       currentPage: json['currentPage'] as int? ?? 0,
+      readPages: (json['readPages'] as List? ?? []).cast<int>().toSet(),
       coverGradient: gradientForProgram(program),
       description: json['description'] as String? ?? '',
       isSyllabus: json['isSyllabus'] as bool? ?? false,
@@ -134,145 +145,3 @@ class LearningMaterial {
     }
   }
 }
-
-// ================================================
-// DEMO DATA — Used as fallback when Supabase is empty.
-// You can remove this list later if you want.
-// ================================================
-List<LearningMaterial> appMaterials = [
-  // BSIT
-  LearningMaterial(
-    id: 'demo_it_201',
-    code: 'IT 201',
-    title: 'Data Structures & Algorithms in Java',
-    program: 'BSIT',
-    year: '2nd Year',
-    term: '1st Sem',
-    instructor: 'Prof. E. Cruz, MSCS',
-    totalPages: 30,
-    currentPage: 0,
-    coverGradient: const [Color(0xFF0284C7), Color(0xFF38BDF8)],
-    description:
-        'Comprehensive guide covering Stacks, Queues, Linked Lists, Trees, Graphs, and Sorting algorithms.',
-  ),
-  LearningMaterial(
-    id: 'demo_it_305',
-    code: 'IT 305',
-    title: 'Information Assurance & Cybersecurity',
-    program: 'BSIT',
-    year: '3rd Year',
-    term: '2nd Sem',
-    instructor: 'Prof. N. Ramos, MIT',
-    totalPages: 28,
-    currentPage: 0,
-    coverGradient: const [Color(0xFF2563EB), Color(0xFF1D4ED8)],
-    description:
-        'Principles of CIA Triad, Cryptography, Network Defense, and Incident Response.',
-    isSyllabus: true,
-  ),
-  LearningMaterial(
-    id: 'demo_it_102',
-    code: 'IT 102',
-    title: 'Computer Programming 1 (Python & Logic)',
-    program: 'BSIT',
-    year: '1st Year',
-    term: '1st Sem',
-    instructor: 'Engr. D. Lim, MIT',
-    totalPages: 20,
-    currentPage: 0,
-    coverGradient: const [Color(0xFF4F46E5), Color(0xFF6366F1)],
-    description:
-        'Introduction to algorithmic thinking, flowcharts, control structures, and functions.',
-  ),
-
-  // BSA
-  LearningMaterial(
-    id: 'demo_acc_101',
-    code: 'ACC 101',
-    title: 'Conceptual Framework & Accounting Standards',
-    program: 'BSA',
-    year: '1st Year',
-    term: '1st Sem',
-    instructor: 'Prof. A. Mendoza, CPA',
-    totalPages: 24,
-    currentPage: 0,
-    coverGradient: const [Color(0xFF059669), Color(0xFF10B981)],
-    description:
-        'Fundamental principles of Philippine Financial Reporting Standards (PFRS).',
-  ),
-  LearningMaterial(
-    id: 'demo_tax_301',
-    code: 'TAX 301',
-    title: 'Income Taxation & TRAIN/EOPT Law Updates',
-    program: 'BSA',
-    year: '3rd Year',
-    term: '2nd Sem',
-    instructor: 'Atty. R. Bautista, CPA',
-    totalPages: 40,
-    currentPage: 0,
-    coverGradient: const [Color(0xFF0D9488), Color(0xFF115E59)],
-    description: 'Comprehensive guide on Individual & Corporate Income Tax.',
-    isSyllabus: true,
-  ),
-
-  // BSBA
-  LearningMaterial(
-    id: 'demo_mktg_101',
-    code: 'MKTG 101',
-    title: 'Principles of Marketing Management',
-    program: 'BSBA',
-    year: '1st Year',
-    term: '1st Sem',
-    instructor: 'Prof. L. Garcia, MBA',
-    totalPages: 26,
-    currentPage: 0,
-    coverGradient: const [Color(0xFFD97706), Color(0xFFF59E0B)],
-    description:
-        'Marketing mix (4Ps), market segmentation, and consumer behavior.',
-  ),
-  LearningMaterial(
-    id: 'demo_ba_402',
-    code: 'BA 402',
-    title: 'Strategic Management & Corporate Policy',
-    program: 'BSBA',
-    year: '4th Year',
-    term: '1st Sem',
-    instructor: 'Prof. K. Villanueva, MBA',
-    totalPages: 34,
-    currentPage: 0,
-    coverGradient: const [Color(0xFFB45309), Color(0xFF92400E)],
-    description:
-        'SWOT analysis, Michael Porter Five Forces, and competitive strategy.',
-    isSyllabus: true,
-  ),
-
-  // BSOA
-  LearningMaterial(
-    id: 'demo_oa_101',
-    code: 'OA 101',
-    title: 'Keyboarding & Document Processing',
-    program: 'BSOA',
-    year: '1st Year',
-    term: '1st Sem',
-    instructor: 'Prof. G. Dizon, MSOA',
-    totalPages: 22,
-    currentPage: 0,
-    coverGradient: const [Color(0xFFE11D48), Color(0xFFF43F5E)],
-    description: 'Touch keyboarding techniques and business letter formatting.',
-  ),
-  LearningMaterial(
-    id: 'demo_oa_302',
-    code: 'OA 302',
-    title: 'Advanced Records Management & Electronic Filing',
-    program: 'BSOA',
-    year: '3rd Year',
-    term: '2nd Sem',
-    instructor: 'Prof. H. Morales, MSOA',
-    totalPages: 32,
-    currentPage: 0,
-    coverGradient: const [Color(0xFFBE123C), Color(0xFF9F1239)],
-    description:
-        'Rules of alphabetic indexing, numeric filing, and document preservation.',
-    isSyllabus: true,
-  ),
-];

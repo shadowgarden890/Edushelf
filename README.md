@@ -4,6 +4,8 @@
 
 Students read and download learning materials and syllabi (online or offline). Faculty upload materials and follow their students' reading activity. The admin manages accounts and approves materials. Syllabi are open to every student.
 
+📘 **Manuals:** [User Manual](docs/Edushelf_User_Manual.docx) (students, faculty, admin) · [Installation Manual](docs/Edushelf_Installation_Manual.docx) (installing, updating, server and email setup, building releases)
+
 Built with **Flutter (Dart)** and a **Supabase (PostgreSQL)** backend.
 
 ---
@@ -64,8 +66,9 @@ The **ID number decides the role and department** automatically:
 
 `DD` = department: **IT** (BSIT), **BA** (BSBA), **AC** (BSA), **OA** (BSOA).
 
-- New accounts get a **temporary password**. On the **first login** the user must set their own password before using the app.
+- New accounts get a **temporary password**. Users go straight to their home page and can change it any time in **Settings** (recommended).
 - **Admins have a permanent recovery password ("master key"):** an admin account's **first password** never expires. If an admin forgets their current password, they just **log in with the recovery password**; no request needed. It keeps working even after they change their everyday password in Settings.
+- **One device at a time:** an account can be signed in on only one device. A second device is refused ("already signed in on a Windows computer…") until the first one logs out, or has had the app closed for 10 minutes. The admin can free an account in **Users → Edit (pencil) → Sign out of device**, e.g. for a lost phone.
 - **Forgot password?** (students and faculty) on the login screen sends a request to the admin. The admin resets it (Users → Password Requests) and gives the user a new temporary password.
 - Anyone can change their password later in **Settings / Profile → Change Password**.
 
@@ -84,7 +87,9 @@ Tabs: **Browse · Updates · My Library · History · Settings**
 - **Download:** the whole material, or **single pages** (download icon on each page). Progress, size and time left show in the **Download Queue**.
 - **Syllabus (curriculum outline):** open to everyone, no permission needed, e.g. to plan subjects or advance one during enrollment. It shows the program's courses as **tables by year and semester** (code, title, units, totals) with **search** by code or title (e.g. `IT 323`) and bigger/smaller text. Read online only, no download. (Older syllabi uploaded as PDF files open as readable text.)
 - **My Library:** everything you downloaded, plus materials saved with the ♥ heart. Works **offline**.
-- **Reader:** **3D flipbook** (swipe or tap the sides to turn pages) or **continuous vertical scroll** with pinch-zoom. **Bookmark** pages; your **reading progress is saved** ("Resume from page X").
+- **Reader:** **3D flipbook** (swipe or tap the sides to turn pages) or **continuous vertical scroll** (pinch-zoom on phones; mouse wheel / scrollbar on Windows). **Bookmark** pages; "Resume from page X" continues where you stopped.
+- **Read pages (✔):** a page gets a check mark only when you actually open it, so skipping ahead doesn't mark the pages in between. Reading progress = pages read ÷ total pages.
+- **Delete downloads** (⋮ menu on a material) asks first, then removes the files **and resets that material's progress and bookmarks**, so a new download starts fresh.
 - **History:** recently opened and downloaded materials.
 - **Settings:** change password, **notifications** (e.g. *Access Granted*), download queue, log out.
 
@@ -99,17 +104,23 @@ Tabs: **Upload · Notifications · Dashboard · Activity · Profile**
 - **Profile:** change password, log out.
 
 ### Admin
-Tabs: **Overview · Users · Materials · Settings**
+Tabs on the **left side**: **Homepage · Users · Materials · Activity · Settings** (icons only on phones; hover or look at the title bar to see which tab is open).
 
-- **Overview:** live statistics.
+- **Homepage:** a greeting, live totals (tap a card to jump to that tab), the **four department logos** (BSIT, BSA, BSBA, BSOA), **Waiting for review** and **Recent activity**.
+- **Department (tap a logo):** the department's totals and five folders:
+  - **Students**, grouped by batch (from the ID: `IT-23-…` → Batch 2023).
+  - **Faculty**; tap one to see everything they uploaded, grouped by year level.
+  - **Syllabus**, with each one's status.
+  - **Reading Materials**, one folder per faculty member who uploaded them, then grouped by year level. Tap a material to preview it.
+  - **Activity Logs** for that department only.
+- **Activity:** everything students do (open, read, stop, bookmark, download), live. **Recent** shows a feed; **By student** shows each student's progress, bookmarks and accessed materials. Filter by department and search by name, ID or material.
 - **Users:** **Create Account** (optional email, so the login details can be emailed right away), **Import CSV** (many accounts at once, then print login slips or export a CSV), **edit / reset password**, **delete**, **Password Requests**.
-- **Materials:** three lists, **Pending · Approved · Archived**.
+- **Materials:** two lists, **Pending · Approved**.
   - *Pending:* **Approve**, or **Revise** with notes (both notify the faculty member). Either way the material leaves Pending right away; revised ones go back to the faculty member.
-  - *Approved:* visible to students. **Archive** takes one down without deleting it.
-  - *Archived:* hidden from students. **Restore** publishes it again; **Delete permanently** removes it and its file for good (asks first).
-  - Syllabi have a 👁 **Preview** button to check their courses before approving.
+  - *Approved:* visible to students.
+  - Every material has a 👁 **Preview** button (PDFs open in the reader, syllabi as course tables; previewing doesn't count as reading) and a 🗑 **Delete** button, which asks first and then deletes the material and its file for good.
 - **Notifications (all users):** **Clear all** at the top of the list, or swipe one notification left/right to clear just that one.
-- **Settings:** change your password.
+- **Settings:** change your password, open Activity Logs, system info.
 
 ---
 
@@ -138,9 +149,11 @@ Give each tester the scenario for their role. Watch, but don't help unless they'
 **Student**
 | # | Task | Expected result |
 |---|---|---|
-| S1 | Log in with the slip, set a new password | Goes to My Library |
+| S1 | Log in with the slip | Goes straight to My Library; then change the password in Settings |
 | S2 | Browse: search for a material by code or title | Material is found |
-| S3 | Open it and read with the **flipbook**; switch to **vertical scroll** | Pages turn / scroll smoothly |
+| S3 | Open it and read with the **flipbook**; switch to **vertical scroll** (on phone **and** Windows) | Pages turn / scroll smoothly, no gray screen |
+| S3b | Tap **page 32** in the page list, go back; then open **page 31** and turn to 32 | Only 32 checked, then only 31 and 32 |
+| S3c | Read a downloaded material, bookmark a page, then **⋮ → Delete downloads** and download again | Progress 0%, no check marks, no bookmarks |
 | S4 | **Bookmark** a page, close the reader, open it again | Bookmark kept, "Resume from page X" |
 | S5 | **Download the whole material**; check the **Download Queue** | Progress bar, then it appears in My Library |
 | S6 | Download **one page** only | Page shows a green check |
@@ -165,11 +178,13 @@ Give each tester the scenario for their role. Watch, but don't help unless they'
 |---|---|---|
 | A1 | Create one account; try the same ID again | Second try shows "already has an account" |
 | A2 | Approve one material and **Revise** another with notes | Both leave Pending at once; faculty member is notified |
-| A2b | Approved → **Archive** a material; check a student's Browse; then Archived → **Restore** | Gone from Browse while archived, back after restoring |
-| A2c | Archived → **Delete permanently** (Cancel once, then Delete) | Stays after Cancel; gone for good after Delete |
+| A2b | Tap 👁 **Preview** on a PDF material and on a syllabus | PDF opens in the reader; syllabus as tables |
+| A2c | 🗑 **Delete** a test material (Cancel once, then Delete) | Stays after Cancel; gone from Browse after Delete |
 | N1 | Any user: open Notifications, swipe one away, then **Clear all** | The list empties and stays empty after reopening |
 | A3 | Approve a material: check a student's **Settings → Notifications** | *New Material Available* |
-| A4 | Users → Password Requests: reset a password and give it to the user | User logs in and must set a new one |
+| A5b | Homepage → tap the **BSIT** logo, open each folder (Students, Faculty, Syllabus, Reading Materials → a faculty folder) | Users by batch; materials grouped by uploader and year level |
+| A5c | Have a student read a material, then open **Activity** (Recent and By student) | The student's opens/pages/bookmarks appear within seconds |
+| A4 | Users → Password Requests: reset a password and give it to the user | User logs in with it, then can change it in Settings |
 | A5 | Delete a test account (then Cancel on another) | Deleted / not deleted |
 
 ### 4.4 Reporting a bug
@@ -279,7 +294,8 @@ All database changes are in `supabase/migrations/`, and **all of them have alrea
 | `20261026000000_realtime_tables.sql` | Turns on live updates for every table the app watches |
 | `20261027000000_lock_down_tables.sql` | Row Level Security for materials, notifications, permissions and activity logs |
 | `20261028000000_syllabus_content.sql` | Stores syllabi as content (courses by semester) instead of files |
-| `20261029000000_material_archive.sql` | Allows the admin to archive approved materials (hidden from students, can be restored) |
+| `20261030000000_remove_material_archive.sql` | Removes the archive feature again (archived materials go back to Approved) |
+| `20261031000000_one_device_per_account.sql` | One device per account: a second device can't sign in while the first is in use |
 
 ### Email notifications (Brevo, free: 300 emails/day)
 Every in-app notification is also emailed to the user, if their **contact on file is an email** (set it in *Create Account*, the CSV *Email* column, or *Edit Account*). To turn it on:
@@ -317,13 +333,14 @@ lib/
     library_service.dart          My Library, History, bookmarks, progress (on the phone)
     download_service.dart         Download queue (whole document / single pages)
     upload_service.dart           Faculty uploads + file checks
-    activity_service.dart         Reading activity logs (for faculty)
+    activity_service.dart         Reading activity logs (faculty and admin)
     credential_slips.dart         Printable login-slip PDF
   screen/
-    login_screen.dart, forgot_password_screen.dart, force_password_change_screen.dart
+    login_screen.dart, forgot_password_screen.dart
     student/                    Student home (tabs), download queue
     teachers/                   Faculty tabs: upload, notifications, dashboard, activity logs
-    admin/                      Admin dashboard, account dialogs, CSV import, password requests
+    admin/                      Admin dashboard, department folders, activity logs, account dialogs, CSV import, password requests
+  models/department.dart        The four departments and their logos (assets/logos/)
     book_pages_directory_screen.dart   Learning material details + pages list
     syllabus_screen.dart               Syllabus: course tables (or text for old PDF ones)
     teachers/syllabus_editor_screen.dart  Faculty syllabus editor + Fill from PDF
